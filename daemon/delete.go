@@ -83,6 +83,12 @@ func (daemon *Daemon) rmLink(container *container.Container, name string) error 
 // cleanupContainer unregisters a container from the daemon, stops stats
 // collection and cleanly removes contents and metadata from the filesystem.
 func (daemon *Daemon) cleanupContainer(container *container.Container, forceRemove bool) (err error) {
+	// If container is starting, wait a while until it's started
+	// to avoid inconsistency
+	if container.IsStarting() {
+		container.WaitRunning(-1 * time.Second)
+	}
+
 	if container.IsRunning() {
 		if !forceRemove {
 			return derr.ErrorCodeRmRunning

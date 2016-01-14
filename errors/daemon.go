@@ -599,6 +599,15 @@ var (
 		HTTPStatusCode: http.StatusNotModified,
 	})
 
+	// ErrorCodeStarting is generated when we try to start a container
+	// that is starting but haven't been started successfully.
+	ErrorCodeStarting = errcode.Register(errGroup, errcode.ErrorDescriptor{
+		Value:          "STARTING",
+		Message:        "Container is starting",
+		Description:    "An attempt to start a container was made, but the container is still starting",
+		HTTPStatusCode: http.StatusNotModified,
+	})
+
 	// ErrorCodeHostConfigStart is generated when a HostConfig is passed
 	// into the start command.
 	ErrorCodeHostConfigStart = errcode.Register(errGroup, errcode.ErrorDescriptor{

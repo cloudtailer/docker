@@ -25,6 +25,10 @@ func (daemon *Daemon) ContainerStart(name string, hostConfig *containertypes.Hos
 		return derr.ErrorCodeAlreadyStarted
 	}
 
+	if container.IsStarting() {
+		return derr.ErrorCodeStarting
+	}
+
 	// Windows does not have the backwards compatibility issue here.
 	if runtime.GOOS != "windows" {
 		// This is kept for backward compatibility - hostconfig should be passed when
@@ -72,13 +76,17 @@ func (daemon *Daemon) containerStart(container *container.Container) (err error)
 	container.Lock()
 	defer container.Unlock()
 
-	if container.Running {
+	if container.Running || container.Starting {
 		return nil
 	}
 
 	if container.RemovalInProgress || container.Dead {
 		return derr.ErrorCodeContainerBeingRemoved
 	}
+
+	// if container's state is OK for start, set its state to starting
+	// to stop user from starting same container twice
+	container.SetStarting()
 
 	// if we encounter an error during start we need to ensure that any other
 	// setup has been cleaned up properly

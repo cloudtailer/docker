@@ -17,6 +17,7 @@ type State struct {
 	sync.Mutex
 	// FIXME: Why do we have both paused and running if a
 	// container cannot be paused and running at the same time?
+	Starting          bool
 	Running           bool
 	Paused            bool
 	Restarting        bool
@@ -51,6 +52,10 @@ func (s *State) String() string {
 		return fmt.Sprintf("Up %s", units.HumanDuration(time.Now().UTC().Sub(s.StartedAt)))
 	}
 
+	if s.Starting {
+		return "Starting"
+	}
+
 	if s.RemovalInProgress {
 		return "Removal In Progress"
 	}
@@ -82,6 +87,10 @@ func (s *State) StateString() string {
 		return "running"
 	}
 
+	if s.Starting {
+		return "starting"
+	}
+
 	if s.Dead {
 		return "dead"
 	}
@@ -100,6 +109,7 @@ func IsValidStateString(s string) bool {
 		s != "running" &&
 		s != "dead" &&
 		s != "created" &&
+		s != "starting" &&
 		s != "exited" {
 		return false
 	}
@@ -119,11 +129,11 @@ func wait(waitChan <-chan struct{}, timeout time.Duration) error {
 	}
 }
 
-// waitRunning waits until state is running. If state is already
+// WaitRunning waits until state is running. If state is already
 // running it returns immediately. If you want wait forever you must
 // supply negative timeout. Returns pid, that was passed to
 // SetRunning.
-func (s *State) waitRunning(timeout time.Duration) (int, error) {
+func (s *State) WaitRunning(timeout time.Duration) (int, error) {
 	s.Lock()
 	if s.Running {
 		pid := s.Pid
@@ -164,6 +174,14 @@ func (s *State) IsRunning() bool {
 	return res
 }
 
+// IsStarting returns whether the running flag is set. Used by Container to check whether a container is running.
+func (s *State) IsStarting() bool {
+	s.Lock()
+	res := s.Starting
+	s.Unlock()
+	return res
+}
+
 // GetPID holds the process id of a container.
 func (s *State) GetPID() int {
 	s.Lock()
@@ -190,12 +208,25 @@ func (s *State) SetRunningLocking(pid int) {
 func (s *State) SetRunning(pid int) {
 	s.Error = ""
 	s.Running = true
+	s.Starting = false
 	s.Paused = false
 	s.Restarting = false
 	s.ExitCode = 0
 	s.Pid = pid
 	s.StartedAt = time.Now().UTC()
 	close(s.waitChan) // fire waiters for start
+	s.waitChan = make(chan struct{})
+}
+
+// SetStarting sets the state of the container to "starting".
+func (s *State) SetStarting() {
+	s.Error = ""
+	s.Running = false
+	s.Starting = true
+	s.Paused = false
+	s.Restarting = false
+	s.ExitCode = 0
+	close(s.waitChan) // fire waiters for starting
 	s.waitChan = make(chan struct{})
 }
 
@@ -209,6 +240,7 @@ func (s *State) SetStoppedLocking(exitStatus *execdriver.ExitStatus) {
 // SetStopped sets the container state to "stopped" without locking.
 func (s *State) SetStopped(exitStatus *execdriver.ExitStatus) {
 	s.Running = false
+	s.Starting = false
 	s.Restarting = false
 	s.Pid = 0
 	s.FinishedAt = time.Now().UTC()
@@ -231,6 +263,7 @@ func (s *State) SetRestarting(exitStatus *execdriver.ExitStatus) {
 	// we should consider the container running when it is restarting because of
 	// all the checks in docker around rm/stop/etc
 	s.Running = true
+	s.Starting = false
 	s.Restarting = true
 	s.Pid = 0
 	s.FinishedAt = time.Now().UTC()

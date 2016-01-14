@@ -329,7 +329,7 @@ func (daemon *Daemon) checkImageDeleteConflict(imgID image.ID, mask conflictType
 	if mask&conflictRunningContainer != 0 {
 		// Check if any running container is using the image.
 		for _, container := range daemon.List() {
-			if !container.IsRunning() {
+			if !container.IsRunning() && !container.IsStarting() {
 				// Skip this until we check for soft conflicts later.
 				continue
 			}
@@ -356,7 +356,7 @@ func (daemon *Daemon) checkImageDeleteConflict(imgID image.ID, mask conflictType
 	if mask&conflictStoppedContainer != 0 {
 		// Check if any stopped containers reference this image.
 		for _, container := range daemon.List() {
-			if container.IsRunning() {
+			if container.IsRunning() || container.IsStarting() {
 				// Skip this as it was checked above in hard conflict conditions.
 				continue
 			}

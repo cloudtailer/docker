@@ -36,12 +36,17 @@ func (daemon *Daemon) update(name string, hostConfig *container.HostConfig) erro
 		return fmt.Errorf("Container is marked for removal and cannot be \"update\".")
 	}
 
-	if container.IsRunning() && hostConfig.KernelMemory != 0 {
+	if (container.IsRunning() || conainer.IsStarting()) && hostConfig.KernelMemory != 0 {
 		return fmt.Errorf("Can not update kernel memory to a running container, please stop it first.")
 	}
 
 	if err := container.UpdateContainer(hostConfig); err != nil {
 		return err
+	}
+
+	// If container is starting, wait a while until it's started
+	if container.IsStarting() {
+		container.WaitRunning(-1 * time.Second)
 	}
 
 	// If container is not running, update hostConfig struct is enough,

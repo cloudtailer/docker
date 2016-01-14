@@ -623,6 +623,11 @@ func (container *Container) UpdateContainer(hostConfig *container.HostConfig) er
 	}
 	container.Unlock()
 
+	// If container is starting, wait a while until it's started
+	if container.IsStarting() {
+		container.WaitRunning(-1 * time.Second)
+	}
+
 	// If container is not running, update hostConfig struct is enough,
 	// resources will be updated when the container is started again.
 	// If container is running (including paused), we need to update
