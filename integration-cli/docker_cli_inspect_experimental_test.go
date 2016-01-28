@@ -12,8 +12,7 @@ func (s *DockerSuite) TestInspectNamedMountPoint(c *check.C) {
 	testRequires(c, DaemonIsLinux)
 	dockerCmd(c, "run", "-d", "--name", "test", "-v", "data:/data", "busybox", "cat")
 
-	vol, err := inspectFieldJSON("test", "Mounts")
-	c.Assert(err, checker.IsNil)
+	vol := inspectFieldJSON(c, "test", "Mounts")
 
 	var mp []types.MountPoint
 	err = unmarshalJSON([]byte(vol), &mp)

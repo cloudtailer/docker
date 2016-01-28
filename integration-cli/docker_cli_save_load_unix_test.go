@@ -41,7 +41,7 @@ func (s *DockerSuite) TestSaveAndLoadRepoStdout(c *check.C) {
 	out, _, err := runCommandWithOutput(loadCmd)
 	c.Assert(err, check.IsNil, check.Commentf(out))
 
-	after, _ := dockerCmd(c, "inspect", "-f", "{{.Id}}", repoName)
+	after := inspectField(c, repoName, "Id")
 
 	c.Assert(before, check.Equals, after) //inspect is not the same after a save / load
 
