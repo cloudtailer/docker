@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/docker/docker/pkg/integration/checker"
+	"github.com/docker/docker/utils"
 	"github.com/docker/go-units"
 	"github.com/docker/libnetwork/iptables"
 	"github.com/docker/libtrust"
@@ -2189,4 +2190,49 @@ func (s *DockerSuite) TestDaemonDiscoveryBackendConfigReload(c *check.C) {
 	c.Assert(err, checker.IsNil)
 	c.Assert(out, checker.Contains, fmt.Sprintf("Cluster Store: consul://consuladdr:consulport/some/path"))
 	c.Assert(out, checker.Contains, fmt.Sprintf("Cluster Advertise: 192.168.56.100:0"))
+}
+
+func (s *DockerDaemonSuite) TestDaemonRestartWithAutoRemoveContainer(c *check.C) {
+	err := s.d.StartWithBusybox()
+	c.Assert(err, checker.IsNil)
+
+	// top1 will be restarted after daemon restarts
+	out, err := s.d.Cmd("run", "-d", "--name", "top1", "--restart", "always", "busybox:latest", "top")
+	c.Assert(err, checker.IsNil, check.Commentf("run top1: %v", out))
+	// top2 will be restarted after daemon restarts
+	out, err = s.d.Cmd("run", "-d", "--rm", "--name", "top2", "--restart", "always", "busybox:latest", "top")
+	c.Assert(err, checker.IsNil, check.Commentf("run top2: %v", out))
+	// top3 will be removed after daemon restarts
+	out, err = s.d.Cmd("run", "-d", "--rm", "--name", "top3", "busybox:latest", "top")
+	c.Assert(err, checker.IsNil, check.Commentf("run top2: %v", out))
+
+	out, err = s.d.Cmd("ps")
+	c.Assert(out, checker.Contains, "top1", check.Commentf("top1 should be running"))
+	c.Assert(out, checker.Contains, "top2", check.Commentf("top2 should be running"))
+	c.Assert(out, checker.Contains, "top3", check.Commentf("top2 should be running"))
+
+	// now restart daemon gracefully
+	err = s.d.Restart()
+	c.Assert(err, checker.IsNil)
+
+	out, err = s.d.Cmd("ps")
+	c.Assert(err, checker.IsNil)
+	c.Assert(out, checker.Contains, "top1", check.Commentf("top1 should exist after daemon restarts"))
+	c.Assert(out, checker.Contains, "top2", check.Commentf("top2 should exist after daemon restarts"))
+	c.Assert(out, checker.Not(checker.Contains), "top3", check.Commentf("top3 should be removed after daemon restarts"))
+
+	if !utils.ExperimentalBuild() {
+		return
+	}
+	// this is only workable for experimental build right now
+	// now force to kill daemon and restart it
+	err = s.d.cmd.Process.Kill()
+	c.Assert(err, checker.IsNil)
+	err = s.d.Restart()
+	c.Assert(err, checker.IsNil)
+
+	out, err = s.d.Cmd("ps")
+	c.Assert(err, checker.IsNil)
+	c.Assert(out, checker.Contains, "top1", check.Commentf("top1 should exist after daemon is forced to restart"))
+	c.Assert(out, checker.Contains, "top2", check.Commentf("top2 should exist after daemon is forced to restart"))
 }

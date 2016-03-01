@@ -10,6 +10,7 @@ import (
 	gosignal "os/signal"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"time"
 
 	"golang.org/x/net/context"
@@ -20,6 +21,8 @@ import (
 	"github.com/docker/docker/registry"
 	"github.com/docker/engine-api/client"
 	"github.com/docker/engine-api/types"
+	eventtypes "github.com/docker/engine-api/types/events"
+	"github.com/docker/engine-api/types/filters"
 	registrytypes "github.com/docker/engine-api/types/registry"
 )
 
@@ -86,19 +89,68 @@ func (cli *DockerCli) resizeTtyTo(id string, height, width int, isExec bool) {
 	}
 }
 
+// find the exit code from events
+// this will be extremely useful especially when container is already removed
+func getExitCodeFromEvents(cli *DockerCli, containerID string) (exitCode int, err error) {
+	eventFilterArgs := filters.NewArgs()
+	eventFilterArgs, _ = filters.ParseFlag("container="+containerID, eventFilterArgs)
+	options := types.EventsOptions{
+		Since:   "0",
+		Until:   fmt.Sprintf("%d", time.Now().Unix()),
+		Filters: eventFilterArgs,
+	}
+
+	responseBody, err := cli.client.Events(context.Background(), options)
+	if err != nil {
+		return -1, err
+	}
+	defer responseBody.Close()
+
+	findExitCodeFunc := func(event eventtypes.Message, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if event.Action == "die" {
+			if len(event.Actor.Attributes) > 0 {
+				for k, v := range event.Actor.Attributes {
+					if k == "exitCode" {
+						if exitCode, err = strconv.Atoi(v); err != nil {
+							return fmt.Errorf("Invalid event attribute: %v=%v", k, v)
+						}
+					}
+				}
+			}
+		}
+		return nil
+	}
+
+	if err = decodeEvents(responseBody, findExitCodeFunc); err != nil {
+		return -1, err
+	}
+
+	return exitCode, nil
+}
+
 // getExitCode perform an inspect on the container. It returns
 // the running state and the exit code.
 func getExitCode(cli *DockerCli, containerID string) (bool, int, error) {
 	c, err := cli.client.ContainerInspect(context.Background(), containerID)
-	if err != nil {
-		// If we can't connect, then the daemon probably died.
-		if err != client.ErrConnectionFailed {
-			return false, -1, err
-		}
-		return false, -1, nil
+	if err == nil {
+		return c.State.Running, c.State.ExitCode, nil
 	}
 
-	return c.State.Running, c.State.ExitCode, nil
+	if err == client.ErrConnectionFailed {
+		// If we can't connect, then the daemon probably died.
+		return false, -1, nil
+	} else if !client.IsErrContainerNotFound(err) {
+		return false, -1, err
+	}
+
+	// if container not found, maybe it's already removed
+	// let's retrieve exit code from events
+	exitCode, err := getExitCodeFromEvents(cli, containerID)
+	return false, exitCode, err
 }
 
 // getExecExitCode perform an inspect on the exec command. It returns

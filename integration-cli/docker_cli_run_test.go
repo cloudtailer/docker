@@ -2864,14 +2864,7 @@ func (s *DockerSuite) TestRunContainerWithRmFlagCannotStartContainer(c *check.C)
 		c.Fatal("Expected docker run to fail", out, err)
 	}
 
-	out, err = getAllContainers()
-	if err != nil {
-		c.Fatal(out, err)
-	}
-
-	if out != "" {
-		c.Fatal("Expected not to have containers", out)
-	}
+	c.Assert(waitRemoved(name, false, 10*time.Second), checker.IsNil)
 }
 
 func (s *DockerSuite) TestRunPidHostWithChildIsKillable(c *check.C) {
@@ -4306,4 +4299,63 @@ func (s *DockerSuite) TestRunTooLongHostname(c *check.C) {
 	// 64 bytes will be OK
 	hostname3 := "this-is-a-hostname-with-64-bytes-so-will-not-give-an-error.local"
 	dockerCmd(c, "run", "--hostname", hostname3, "busybox", "echo", "test")
+}
+
+func (s *DockerSuite) TestRunRmWithRestartPolicy(c *check.C) {
+	// run container test1 with restart policy "always", it won't be removed until stoped
+	dockerCmd(c, "run", "-d", "--name=test1", "--rm", "--restart=always", "busybox", "false")
+	// run container test2 with restart policy "on-failure", it will be autoremoved
+	dockerCmd(c, "run", "-d", "--name=test2", "--rm", "--restart=on-failure:3", "busybox", "false")
+
+	// wait until test2 is auto removed.
+	waitTime := 10 * time.Second
+	if daemonPlatform == "windows" {
+		// nslookup isn't present in Windows busybox. Is built-in.
+		waitTime = 120 * time.Second
+	}
+
+	err := waitRemoved("test2", false, waitTime)
+	c.Assert(err, checker.IsNil, check.Commentf("test2 should be removed in timeout"))
+
+	// listening events, check restart count
+	var (
+		startCount int
+		destroyed  bool
+	)
+	out, _ := dockerCmd(c, "events", "--since=0", fmt.Sprintf("--until=%d", daemonTime(c).Unix()))
+	events := strings.Split(strings.TrimSpace(out), "\n")
+
+	nEvents := len(events)
+	c.Assert(nEvents, checker.GreaterOrEqualThan, 1) //Missing expected event
+	actions := eventActionsByIDAndType(c, events, "test1", "container")
+
+	for _, a := range actions {
+		switch a {
+		case "start":
+			startCount++
+		case "destroy":
+			destroyed = true
+		}
+	}
+	c.Assert(startCount, checker.GreaterThan, 1, check.Commentf("test1 should have restarted more than once without auto removed: %v", actions))
+	c.Assert(destroyed, checker.False, check.Commentf("test1 shouldn't be destroyed: %v", actions))
+
+	actions = eventActionsByIDAndType(c, events, "test2", "container")
+	startCount = 0
+	destroyed = false
+	for _, a := range actions {
+		switch a {
+		case "start":
+			startCount++
+		case "destroy":
+			destroyed = true
+		}
+	}
+	c.Assert(startCount, checker.Equals, 4, check.Commentf("test2 should have restarted 3 times"))
+	c.Assert(destroyed, checker.True, check.Commentf("test2 should be destroyed"))
+
+	// stop test1, check if it's autoremoved
+	dockerCmd(c, "stop", "test1")
+	err = waitRemoved("test1", false, waitTime)
+	c.Assert(err, checker.IsNil, check.Commentf("test1 should be auto removed after manually stopped"))
 }
