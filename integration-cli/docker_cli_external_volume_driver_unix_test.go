@@ -264,6 +264,10 @@ func (s *DockerExternalVolumeSuite) TestExternalVolumeDriverUnnamed(c *check.C) 
 	c.Assert(err, checker.IsNil, check.Commentf(out))
 	c.Assert(out, checker.Contains, s.server.URL)
 
+	// wait volume removal to really happen
+	err = waitRemoved("test-data", false, 5*time.Second)
+	c.Assert(err, checker.IsNil)
+
 	c.Assert(s.ec.activations, checker.Equals, 1)
 	c.Assert(s.ec.creations, checker.Equals, 1)
 	c.Assert(s.ec.removals, checker.Equals, 1)

@@ -1351,6 +1351,35 @@ func waitForContainer(contID string, args ...string) error {
 	return nil
 }
 
+func waitRemoved(nameOrID string, byID bool, duration time.Duration) error {
+	after := time.After(duration)
+	args := []string{"ps", "-a", "-f"}
+	if byID {
+		args = append(args, "id="+nameOrID)
+	} else {
+		args = append(args, "name="+nameOrID)
+	}
+
+	for {
+		cmd := exec.Command(dockerBinary, args...)
+		out, _, err := runCommandWithOutput(cmd)
+		if err != nil {
+			return err
+		}
+
+		if !strings.Contains(out, nameOrID) {
+			return nil
+		}
+
+		select {
+		case <-after:
+			return fmt.Errorf("Wait container %q remove timeout", nameOrID)
+		default:
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
 // waitRun will wait for the specified container to be running, maximum 5 seconds.
 func waitRun(contID string) error {
 	return waitInspect(contID, "{{.State.Running}}", "true", 5*time.Second)

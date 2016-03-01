@@ -272,6 +272,7 @@ func (daemon *Daemon) restore() error {
 	}
 
 	var migrateLegacyLinks bool
+	removeContainers := make(map[string]*container.Container)
 	restartContainers := make(map[*container.Container]chan struct{})
 	for _, c := range containers {
 		if err := daemon.registerName(c); err != nil {
@@ -303,10 +304,14 @@ func (daemon *Daemon) restore() error {
 			}
 			// fixme: only if not running
 			// get list of containers we need to restart
-			if daemon.configStore.AutoRestart && !c.IsRunning() && !c.IsPaused() && c.ShouldRestart() {
-				mapLock.Lock()
-				restartContainers[c] = make(chan struct{})
-				mapLock.Unlock()
+			if !c.IsRunning() && !c.IsPaused() {
+				if daemon.configStore.AutoRestart && c.ShouldRestart() {
+					mapLock.Lock()
+					restartContainers[c] = make(chan struct{})
+					mapLock.Unlock()
+				} else if c.HostConfig != nil && c.HostConfig.AutoRemove {
+					removeContainers[c.ID] = c
+				}
 			}
 
 			// if c.hostConfig.Links is nil (not just empty), then it is using the old sqlite links and needs to be migrated
@@ -370,6 +375,18 @@ func (daemon *Daemon) restore() error {
 	}
 	group.Wait()
 
+	removeGroup := sync.WaitGroup{}
+	for id := range removeContainers {
+		removeGroup.Add(1)
+		go func(cid string) {
+			defer removeGroup.Done()
+			if err := daemon.ContainerRm(cid, &types.ContainerRmConfig{ForceRemove: true, RemoveVolume: true}); err != nil {
+				logrus.Errorf("Failed to remove container %s: %s", cid, err)
+			}
+		}(id)
+	}
+	removeGroup.Wait()
+
 	// any containers that were started above would already have had this done,
 	// however we need to now prepare the mountpoints for the rest of the containers as well.
 	// This shouldn't cause any issue running on the containers that already had this run.
@@ -382,7 +399,11 @@ func (daemon *Daemon) restore() error {
 		// has a volume and the volume dirver is not available.
 		if _, ok := restartContainers[c]; ok {
 			continue
+		} else if _, ok := removeContainers[c.ID]; ok {
+			// container is automatically removed, skip it.
+			continue
 		}
+
 		group.Add(1)
 		go func(c *container.Container) {
 			defer group.Done()
@@ -860,7 +881,21 @@ func (daemon *Daemon) Shutdown() error {
 				return
 			}
 			logrus.Debugf("stopping %s", c.ID)
-			if err := daemon.shutdownContainer(c); err != nil {
+
+			// temporarily disable AutoRemove
+			autoRemove := c.HostConfig.AutoRemove
+
+			c.HostConfig.AutoRemove = false
+			err := daemon.shutdownContainer(c)
+			// restore AutoRemove irrespective of whether the shutdown worked or not
+			c.HostConfig.AutoRemove = autoRemove
+			// shutdownContainer will write HostConfig to disk, we shall restore AutoRemove
+			// in disk too
+			if toDiskErr := c.ToDiskLocking(); toDiskErr != nil {
+				logrus.Errorf("Write container to disk error: %v", toDiskErr)
+			}
+
+			if err != nil {
 				logrus.Errorf("Stop container error: %v", err)
 				return
 			}

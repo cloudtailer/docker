@@ -71,16 +71,13 @@ func (cli *DockerCli) CmdRun(args ...string) error {
 
 	// These are flags not stored in Config/HostConfig
 	var (
-		flAutoRemove = cmd.Bool([]string{"-rm"}, false, "Automatically remove the container when it exits")
 		flDetach     = cmd.Bool([]string{"d", "-detach"}, false, "Run container in background and print container ID")
 		flSigProxy   = cmd.Bool([]string{"-sig-proxy"}, true, "Proxy received signals to the process")
 		flName       = cmd.String([]string{"-name"}, "", "Assign a name to the container")
 		flDetachKeys = cmd.String([]string{"-detach-keys"}, "", "Override the key sequence for detaching a container")
 		flAttach     *opts.ListOpts
 
-		ErrConflictAttachDetach               = fmt.Errorf("Conflicting options: -a and -d")
-		ErrConflictRestartPolicyAndAutoRemove = fmt.Errorf("Conflicting options: --restart and --rm")
-		ErrConflictDetachAutoRemove           = fmt.Errorf("Conflicting options: --rm and -d")
+		ErrConflictAttachDetach = fmt.Errorf("Conflicting options: -a and -d")
 	)
 
 	config, hostConfig, networkingConfig, cmd, err := runconfigopts.Parse(cmd, args)
@@ -123,9 +120,6 @@ func (cli *DockerCli) CmdRun(args ...string) error {
 			if flAttach.Len() != 0 {
 				return ErrConflictAttachDetach
 			}
-		}
-		if *flAutoRemove {
-			return ErrConflictDetachAutoRemove
 		}
 
 		config.AttachStdin = false
@@ -170,9 +164,7 @@ func (cli *DockerCli) CmdRun(args ...string) error {
 			fmt.Fprintf(cli.out, "%s\n", createResponse.ID)
 		}()
 	}
-	if *flAutoRemove && (hostConfig.RestartPolicy.IsAlways() || hostConfig.RestartPolicy.IsOnFailure()) {
-		return ErrConflictRestartPolicyAndAutoRemove
-	}
+
 	attach := config.AttachStdin || config.AttachStdout || config.AttachStderr
 	if attach {
 		var (
@@ -222,14 +214,6 @@ func (cli *DockerCli) CmdRun(args ...string) error {
 		})
 	}
 
-	if *flAutoRemove {
-		defer func() {
-			if err := cli.removeContainer(createResponse.ID, true, false, true); err != nil {
-				fmt.Fprintf(cli.err, "%v\n", err)
-			}
-		}()
-	}
-
 	//start the container
 	if err := cli.client.ContainerStart(context.Background(), createResponse.ID); err != nil {
 		// If we have holdHijackedConnection, we should notify
@@ -266,31 +250,20 @@ func (cli *DockerCli) CmdRun(args ...string) error {
 
 	var status int
 
-	// Attached mode
-	if *flAutoRemove {
-		// Autoremove: wait for the container to finish, retrieve
-		// the exit code and remove the container
+	// Attached mode: simply retrieve the exit code
+	if !config.Tty {
+		// In non-TTY mode, we can't detach, so we must wait for container exit
 		if status, err = cli.client.ContainerWait(context.Background(), createResponse.ID); err != nil {
-			return runStartContainerErr(err)
-		}
-		if _, status, err = getExitCode(cli, createResponse.ID); err != nil {
 			return err
 		}
 	} else {
-		// No Autoremove: Simply retrieve the exit code
-		if !config.Tty {
-			// In non-TTY mode, we can't detach, so we must wait for container exit
-			if status, err = cli.client.ContainerWait(context.Background(), createResponse.ID); err != nil {
-				return err
-			}
-		} else {
-			// In TTY mode, there is a race: if the process dies too slowly, the state could
-			// be updated after the getExitCode call and result in the wrong exit code being reported
-			if _, status, err = getExitCode(cli, createResponse.ID); err != nil {
-				return err
-			}
+		// In TTY mode, there is a race: if the process dies too slowly, the state could
+		// be updated after the getExitCode call and result in the wrong exit code being reported
+		if _, status, err = getExitCode(cli, createResponse.ID); err != nil {
+			return err
 		}
 	}
+
 	if status != 0 {
 		return Cli.StatusError{StatusCode: status}
 	}
