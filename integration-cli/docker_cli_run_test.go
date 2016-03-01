@@ -4439,3 +4439,12 @@ func (s *DockerSuite) TestRunAddHostInHostMode(c *check.C) {
 	out, _ := dockerCmd(c, "run", "--add-host=extra:1.2.3.4", "--net=host", "busybox", "cat", "/etc/hosts")
 	c.Assert(out, checker.Contains, expectedOutput, check.Commentf("Expected '%s', but got %q", expectedOutput, out))
 }
+
+func (s *DockerSuite) TestRunRmAndWait(c *check.C) {
+	dockerCmd(c, "run", "--name=test", "--rm", "-d", "busybox", "sh", "-c", "sleep 3;exit 2")
+
+	out, code, err := dockerCmdWithError("wait", "test")
+	c.Assert(err, checker.IsNil, check.Commentf("out: %s; exit code: %d", out, code))
+	c.Assert(out, checker.Equals, "2\n", check.Commentf("exit code: %d", code))
+	c.Assert(code, checker.Equals, 0)
+}

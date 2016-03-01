@@ -2378,3 +2378,28 @@ func (s *DockerDaemonSuite) TestDaemonDnsOptionsInHostMode(c *check.C) {
 	out, _ := s.d.Cmd("run", "--net=host", "busybox", "cat", "/etc/resolv.conf")
 	c.Assert(out, checker.Contains, expectedOutput, check.Commentf("Expected '%s', but got %q", expectedOutput, out))
 }
+
+func (s *DockerDaemonSuite) TestDaemonRestartWithAutoRemoveContainer(c *check.C) {
+	err := s.d.StartWithBusybox()
+	c.Assert(err, checker.IsNil)
+
+	// top1 will exist after daemon restarts
+	out, err := s.d.Cmd("run", "-d", "--name", "top1", "busybox:latest", "top")
+	c.Assert(err, checker.IsNil, check.Commentf("run top1: %v", out))
+	// top2 will be removed after daemon restarts
+	out, err = s.d.Cmd("run", "-d", "--rm", "--name", "top2", "busybox:latest", "top")
+	c.Assert(err, checker.IsNil, check.Commentf("run top2: %v", out))
+
+	out, err = s.d.Cmd("ps")
+	c.Assert(out, checker.Contains, "top1", check.Commentf("top1 should be running"))
+	c.Assert(out, checker.Contains, "top2", check.Commentf("top2 should be running"))
+
+	// now restart daemon gracefully
+	err = s.d.Restart()
+	c.Assert(err, checker.IsNil)
+
+	out, err = s.d.Cmd("ps", "-a")
+	c.Assert(err, checker.IsNil, check.Commentf("out: %v", out))
+	c.Assert(out, checker.Contains, "top1", check.Commentf("top1 should exist after daemon restarts"))
+	c.Assert(out, checker.Not(checker.Contains), "top2", check.Commentf("top2 should be removed after daemon restarts"))
+}

@@ -97,6 +97,7 @@ type ContainerOptions struct {
 	flIsolation         *string
 	flShmSize           *string
 	flNoHealthcheck     *bool
+	flAutoRemove        *bool
 	flHealthCmd         *string
 	flHealthInterval    *time.Duration
 	flHealthTimeout     *time.Duration
@@ -184,6 +185,7 @@ func AddFlags(flags *pflag.FlagSet) *ContainerOptions {
 		flStopSignal:        flags.String("stop-signal", signal.DefaultStopSignal, fmt.Sprintf("Signal to stop a container, %v by default", signal.DefaultStopSignal)),
 		flIsolation:         flags.String("isolation", "", "Container isolation technology"),
 		flShmSize:           flags.String("shm-size", "", "Size of /dev/shm, default value is 64MB"),
+		flAutoRemove:        flags.Bool("rm", false, "Automatically remove the container when it exits"),
 		flNoHealthcheck:     flags.Bool("no-healthcheck", false, "Disable any container-specified HEALTHCHECK"),
 		flHealthCmd:         flags.String("health-cmd", "", "Command to run to check health"),
 		flHealthInterval:    flags.Duration("health-interval", 0, "Time between running the check"),
@@ -229,7 +231,6 @@ func AddFlags(flags *pflag.FlagSet) *ContainerOptions {
 // a HostConfig and returns them with the specified command.
 // If the specified args are not valid, it will return an error.
 func Parse(flags *pflag.FlagSet, copts *ContainerOptions) (*container.Config, *container.HostConfig, *networktypes.NetworkingConfig, error) {
-
 	var (
 		attachStdin  = copts.flAttach.Get("stdin")
 		attachStdout = copts.flAttach.Get("stdout")
@@ -531,6 +532,7 @@ func Parse(flags *pflag.FlagSet, copts *ContainerOptions) (*container.Config, *c
 		Binds:           binds,
 		ContainerIDFile: *copts.flContainerIDFile,
 		OomScoreAdj:     *copts.flOomScoreAdj,
+		AutoRemove:      *copts.flAutoRemove,
 		Privileged:      *copts.flPrivileged,
 		PortBindings:    portBindings,
 		Links:           copts.flLinks.GetAll(),

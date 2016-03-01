@@ -10,6 +10,7 @@ import (
 	gosignal "os/signal"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"time"
 
 	"golang.org/x/net/context"
@@ -20,6 +21,8 @@ import (
 	"github.com/docker/docker/registry"
 	"github.com/docker/engine-api/client"
 	"github.com/docker/engine-api/types"
+	eventtypes "github.com/docker/engine-api/types/events"
+	"github.com/docker/engine-api/types/filters"
 	registrytypes "github.com/docker/engine-api/types/registry"
 )
 
