@@ -2,6 +2,7 @@ package client
 
 import (
 	"encoding/json"
+	"net/url"
 
 	"golang.org/x/net/context"
 
@@ -10,8 +11,12 @@ import (
 
 // ContainerWait pauses execution until a container exits.
 // It returns the API status code as response of its readiness.
-func (cli *Client) ContainerWait(ctx context.Context, containerID string) (int, error) {
-	resp, err := cli.post(ctx, "/containers/"+containerID+"/wait", nil, nil, nil)
+func (cli *Client) ContainerWait(ctx context.Context, containerID, custom string) (int, error) {
+	query := url.Values{}
+	if len(custom) > 0 {
+		query.Set("custom", custom)
+	}
+	resp, err := cli.post(ctx, "/containers/"+containerID+"/wait", query, nil, nil)
 	if err != nil {
 		return -1, err
 	}

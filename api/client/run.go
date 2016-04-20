@@ -153,6 +153,8 @@ func (cli *DockerCli) CmdRun(args ...string) error {
 	var (
 		waitDisplayID chan struct{}
 		errCh         chan error
+		errWaitCh     chan error
+		status        int
 		cancelFun     context.CancelFunc
 		ctx           context.Context
 	)
@@ -212,6 +214,22 @@ func (cli *DockerCli) CmdRun(args ...string) error {
 			}
 			return errHijack
 		})
+
+		// if attach without tty, container can't detach, so we must wait it until it exits
+		if !config.Tty {
+			waitString := "running,exited"
+			if hostConfig.AutoRemove {
+				// if container is set to be automatically removed, wait for it to be removed
+				waitString += ",removed"
+			}
+			errWaitCh = promise.Go(func() error {
+				var err error
+				if status, err = cli.client.ContainerWait(context.Background(), createResponse.ID, waitString); err != nil {
+					return err
+				}
+				return nil
+			})
+		}
 	}
 
 	//start the container
@@ -248,12 +266,10 @@ func (cli *DockerCli) CmdRun(args ...string) error {
 		return nil
 	}
 
-	var status int
-
-	// Attached mode: simply retrieve the exit code
+	// Attached mode:
 	if !config.Tty {
 		// In non-TTY mode, we can't detach, so we must wait for container exit
-		if status, err = cli.client.ContainerWait(context.Background(), createResponse.ID); err != nil {
+		if err := <-errWaitCh; err != nil {
 			return err
 		}
 	} else {

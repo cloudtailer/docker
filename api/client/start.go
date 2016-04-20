@@ -111,25 +111,49 @@ func (cli *DockerCli) CmdStart(args ...string) error {
 			return errHijack
 		})
 
-		// 3. Start the container.
-		if err := cli.client.ContainerStart(context.Background(), container); err != nil {
+		// 3. open one goroutine to wait container to be removed if AutoRemove is set
+		var (
+			errWaitChan = make(chan error)
+			status      int
+		)
+		if c.HostConfig.AutoRemove {
+			waitString := "running,exited,removed"
+			errWaitChan = promise.Go(func() error {
+				if status, err = cli.client.ContainerWait(context.Background(), container, waitString); err != nil {
+					return err
+				}
+				return nil
+			})
+		} else {
+			close(errWaitChan)
+		}
+
+		// 4. Start the container.
+		if err = cli.client.ContainerStart(context.Background(), container); err != nil {
 			cancelFun()
 			<-cErr
 			return err
 		}
 
-		// 4. Wait for attachment to break.
+		// 5. Wait for attachment to break.
 		if c.Config.Tty && cli.isTerminalOut {
-			if err := cli.monitorTtySize(container, false); err != nil {
+			if err = cli.monitorTtySize(container, false); err != nil {
 				fmt.Fprintf(cli.err, "Error monitoring TTY size: %s\n", err)
 			}
 		}
 		if attchErr := <-cErr; attchErr != nil {
 			return attchErr
 		}
-		_, status, err := getExitCode(cli, container)
-		if err != nil {
-			return err
+
+		if c.HostConfig.AutoRemove {
+			if err = <-errWaitChan; err != nil {
+				return err
+			}
+		} else {
+			_, status, err = getExitCode(cli, container)
+			if err != nil {
+				return err
+			}
 		}
 		if status != 0 {
 			return Cli.StatusError{StatusCode: status}

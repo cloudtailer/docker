@@ -17,13 +17,14 @@ import (
 // Usage: docker wait CONTAINER [CONTAINER...]
 func (cli *DockerCli) CmdWait(args ...string) error {
 	cmd := Cli.Subcmd("wait", []string{"CONTAINER [CONTAINER...]"}, Cli.DockerCommands["wait"].Description, true)
+	flUntil := cmd.String([]string{"-custom"}, "", "customize your wait bahavior")
 	cmd.Require(flag.Min, 1)
 
 	cmd.ParseFlags(args, true)
 
 	var errs []string
 	for _, name := range cmd.Args() {
-		status, err := cli.client.ContainerWait(context.Background(), name)
+		status, err := cli.client.ContainerWait(context.Background(), name, *flUntil)
 		if err != nil {
 			errs = append(errs, err.Error())
 		} else {

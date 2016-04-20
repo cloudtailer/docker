@@ -43,7 +43,7 @@ type stateBackend interface {
 	ContainerStop(name string, seconds int) error
 	ContainerUnpause(name string) error
 	ContainerUpdate(name string, hostConfig *container.HostConfig) ([]string, error)
-	ContainerWait(name string, timeout time.Duration) (int, error)
+	ContainerWait(name string, timeout time.Duration, custom string) (int, error)
 }
 
 // monitorBackend includes functions to implement to provide containers monitoring functionality.
