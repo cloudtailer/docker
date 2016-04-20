@@ -126,7 +126,7 @@ type Backend interface {
 	// ContainerStart starts a new container
 	ContainerStart(containerID string, hostConfig *container.HostConfig) error
 	// ContainerWait stops processing until the given container is stopped.
-	ContainerWait(containerID string, timeout time.Duration) (int, error)
+	ContainerWait(containerID string, timeout time.Duration, custom string) (int, error)
 	// ContainerUpdateCmdOnBuild updates container.Path and container.Args
 	ContainerUpdateCmdOnBuild(containerID string, cmd []string) error
 

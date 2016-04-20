@@ -250,7 +250,14 @@ func (s *containerRouter) postContainersUnpause(ctx context.Context, w http.Resp
 }
 
 func (s *containerRouter) postContainersWait(ctx context.Context, w http.ResponseWriter, r *http.Request, vars map[string]string) error {
-	status, err := s.backend.ContainerWait(vars["name"], -1*time.Second)
+	if err := httputils.ParseForm(r); err != nil {
+		return err
+	}
+
+	custom := r.Form.Get("custom")
+	logrus.Debugf("========Custom wait sequence: %s", custom)
+
+	status, err := s.backend.ContainerWait(vars["name"], -1*time.Second, custom)
 	if err != nil {
 		return err
 	}

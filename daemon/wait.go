@@ -7,7 +7,7 @@ import "time"
 // successful stop, the exit code of the container is returned. On a
 // timeout, an error is returned. If you want to wait forever, supply
 // a negative duration for the timeout.
-func (daemon *Daemon) ContainerWait(name string, timeout time.Duration) (int, error) {
+func (daemon *Daemon) ContainerWait(name string, timeout time.Duration, custom string) (int, error) {
 	container, err := daemon.GetContainer(name)
 	if err != nil {
 		return -1, err

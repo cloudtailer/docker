@@ -42,7 +42,7 @@ type APIClient interface {
 	ContainerTop(ctx context.Context, container string, arguments []string) (types.ContainerProcessList, error)
 	ContainerUnpause(ctx context.Context, container string) error
 	ContainerUpdate(ctx context.Context, container string, updateConfig container.UpdateConfig) error
-	ContainerWait(ctx context.Context, container string) (int, error)
+	ContainerWait(ctx context.Context, container, custom string) (int, error)
 	CopyFromContainer(ctx context.Context, container, srcPath string) (io.ReadCloser, types.ContainerPathStat, error)
 	CopyToContainer(ctx context.Context, container, path string, content io.Reader, options types.CopyToContainerOptions) error
 	Events(ctx context.Context, options types.EventsOptions) (io.ReadCloser, error)

@@ -26,13 +26,15 @@ type State struct {
 	Error             string // contains last known error when starting the container
 	StartedAt         time.Time
 	FinishedAt        time.Time
-	waitChan          chan struct{}
+	waitRunChan       chan struct{}
+	waitStopChan      chan struct{}
 }
 
 // NewState creates a default state object with a fresh channel for state changes.
 func NewState() *State {
 	return &State{
-		waitChan: make(chan struct{}),
+		waitRunChan:  make(chan struct{}),
+		waitStopChan: make(chan struct{}),
 	}
 }
 
@@ -128,7 +130,7 @@ func (s *State) WaitRunning(timeout time.Duration) (int, error) {
 		s.Unlock()
 		return pid, nil
 	}
-	waitChan := s.waitChan
+	waitChan := s.waitRunChan
 	s.Unlock()
 	if err := wait(waitChan, timeout); err != nil {
 		return -1, err
@@ -146,7 +148,7 @@ func (s *State) WaitStop(timeout time.Duration) (int, error) {
 		s.Unlock()
 		return exitCode, nil
 	}
-	waitChan := s.waitChan
+	waitChan := s.waitStopChan
 	s.Unlock()
 	if err := wait(waitChan, timeout); err != nil {
 		return -1, err
@@ -188,8 +190,8 @@ func (s *State) SetRunning(pid int, initial bool) {
 	if initial {
 		s.StartedAt = time.Now().UTC()
 	}
-	close(s.waitChan) // fire waiters for start
-	s.waitChan = make(chan struct{})
+	close(s.waitRunChan) // fire waiters for start
+	s.waitRunChan = make(chan struct{})
 }
 
 // SetStoppedLocking locks the container state is sets it to "stopped".
@@ -207,8 +209,8 @@ func (s *State) SetStopped(exitStatus *ExitStatus) {
 	s.Pid = 0
 	s.FinishedAt = time.Now().UTC()
 	s.setFromExitStatus(exitStatus)
-	close(s.waitChan) // fire waiters for stop
-	s.waitChan = make(chan struct{})
+	close(s.waitStopChan) // fire waiters for stop
+	s.waitStopChan = make(chan struct{})
 }
 
 // SetRestartingLocking is when docker handles the auto restart of containers when they are
@@ -229,8 +231,8 @@ func (s *State) SetRestarting(exitStatus *ExitStatus) {
 	s.Pid = 0
 	s.FinishedAt = time.Now().UTC()
 	s.setFromExitStatus(exitStatus)
-	close(s.waitChan) // fire waiters for stop
-	s.waitChan = make(chan struct{})
+	close(s.waitStopChan) // fire waiters for stop
+	s.waitStopChan = make(chan struct{})
 }
 
 // SetError sets the container's error state. This is useful when we want to
