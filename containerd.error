@@ -1,0 +1,98 @@
+ERRO[3040] containerd: start container                   error=oci runtime error: exit status 2: runtime/cgo: pthread_create failed: Resource temporarily unavailable
+SIGABRT: abort
+PC=0x1221377 m=4
+
+goroutine 0 [idle]:
+
+goroutine 1 [chan receive, locked to thread]:
+text/template/parse.(*Tree).peekNonSpace(0xc8200c0540, 0x0, 0x0, 0x0, 0x0)
+	/usr/local/go/src/text/template/parse/parse.go:112 +0x169
+text/template/parse.(*Tree).itemList(0xc8200c0540, 0xc8202fa8d0, 0x0, 0x0)
+	/usr/local/go/src/text/template/parse/parse.go:328 +0xd4
+text/template/parse.(*Tree).parseControl(0xc8200c0540, 0x0, 0x180b360, 0x5, 0x0, 0xa, 0xc820204eb0, 0x0, 0x0)
+	/usr/local/go/src/text/template/parse/parse.go:452 +0x163
+text/template/parse.(*Tree).rangeControl(0xc8200c0540, 0x0, 0x0)
+	/usr/local/go/src/text/template/parse/parse.go:494 +0x5c
+text/template/parse.(*Tree).action(0xc8200c0540, 0x0, 0x0)
+	/usr/local/go/src/text/template/parse/parse.go:368 +0x4c3
+text/template/parse.(*Tree).textOrAction(0xc8200c0540, 0x0, 0x0)
+	/usr/local/go/src/text/template/parse/parse.go:347 +0x8d
+text/template/parse.(*Tree).itemList(0xc8200c0540, 0xc8202fa750, 0x0, 0x0)
+	/usr/local/go/src/text/template/parse/parse.go:329 +0x103
+text/template/parse.(*Tree).parseControl(0xc8200c0540, 0xc8202f8f00, 0x180b360, 0x5, 0x0, 0x4, 0xc820204dc0, 0x0, 0x0)
+	/usr/local/go/src/text/template/parse/parse.go:452 +0x163
+text/template/parse.(*Tree).rangeControl(0xc8200c0540, 0x0, 0x0)
+	/usr/local/go/src/text/template/parse/parse.go:494 +0x5c
+text/template/parse.(*Tree).action(0xc8200c0540, 0x0, 0x0)
+	/usr/local/go/src/text/template/parse/parse.go:368 +0x4c3
+text/template/parse.(*Tree).textOrAction(0xc8200c0540, 0x0, 0x0)
+	/usr/local/go/src/text/template/parse/parse.go:347 +0x8d
+text/template/parse.(*Tree).parse(0xc8200c0540, 0xc8202fa660, 0x0, 0x0)
+	/usr/local/go/src/text/template/parse/parse.go:292 +0x684
+text/template/parse.(*Tree).Parse(0xc8200c0540, 0x1b6df80, 0x172, 0x0, 0x0, 0x0, 0x0, 0xc8202fa660, 0xc8202fc250, 0x2, ...)
+	/usr/local/go/src/text/template/parse/parse.go:231 +0x269
+text/template/parse.Parse(0x181f7a0, 0x9, 0x1b6df80, 0x172, 0x0, 0x0, 0x0, 0x0, 0xc8202fc250, 0x2, ...)
+	/usr/local/go/src/text/template/parse/parse.go:54 +0x14c
+text/template.(*Template).Parse(0xc8202f8f80, 0x1b6df80, 0x172, 0xc8201b7bd0, 0x0, 0x0)
+	/usr/local/go/src/text/template/template.go:195 +0x2ab
+html/template.(*Template).Parse(0xc8202fa630, 0x1b6df80, 0x172, 0x0, 0x0, 0x0)
+	/usr/local/go/src/html/template/template.go:158 +0xb8
+net/rpc.init()
+	/usr/local/go/src/net/rpc/debug.go:39 +0xf8
+github.com/ugorji/go/codec.init()
+	/go/src/github.com/ugorji/go/codec/time.go:193 +0xa7
+github.com/coreos/etcd/client.init()
+	/go/src/github.com/coreos/etcd/client/srv.go:65 +0x8d
+github.com/docker/libkv/store/etcd.init()
+	/go/src/github.com/docker/libkv/store/etcd/etcd.go:593 +0x6a
+github.com/docker/libnetwork/datastore.init()
+	/go/src/github.com/docker/libnetwork/datastore/mock_store.go:129 +0x74
+github.com/docker/libnetwork/config.init()
+	/go/src/github.com/docker/libnetwork/config/config.go:251 +0x59
+github.com/docker/libnetwork.init()
+	/go/src/github.com/docker/libnetwork/store.go:463 +0x6f
+github.com/docker/docker/api/server/router/network.init()
+	/go/src/github.com/docker/docker/api/server/router/network/network_routes.go:277 +0x47
+main.init()
+	/go/src/github.com/docker/docker/docker/flags.go:30 +0xb0
+
+goroutine 17 [syscall, locked to thread]:
+runtime.goexit()
+	/usr/local/go/src/runtime/asm_amd64.s:1721 +0x1
+
+goroutine 6 [syscall]:
+os/signal.loop()
+	/usr/local/go/src/os/signal/signal_unix.go:22 +0x18
+created by os/signal.init.1
+	/usr/local/go/src/os/signal/signal_unix.go:28 +0x37
+
+goroutine 7 [runnable]:
+text/template/parse.lexRightDelim(0xc82020ec80, 0x1b405c0)
+	/usr/local/go/src/text/template/parse/lex.go:272 +0xc1
+text/template/parse.(*lexer).run(0xc82020ec80)
+	/usr/local/go/src/text/template/parse/lex.go:206 +0x52
+created by text/template/parse.lex
+	/usr/local/go/src/text/template/parse/lex.go:199 +0x15d
+
+rax    0x0
+rbx    0x22e3208
+rcx    0x1221377
+rdx    0x6
+rdi    0xe3b
+rsi    0x4dda
+rbp    0x1b91a75
+rsp    0x7fcd654c8838
+r8     0xa
+r9     0x7fcd654c9700
+r10    0x8
+r11    0x202
+r12    0x7fcd580008c0
+r13    0x1b389a8
+r14    0x0
+r15    0x8
+rip    0x1221377
+rflags 0x202
+cs     0x33
+fs     0x0
+gs     0x0
+ id=2ae84ccac4a3d8680f385c9e72e78a0ad58e185a15e1752fde98998c59599d34
