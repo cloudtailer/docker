@@ -132,6 +132,7 @@ This section lists each version from latest to oldest.  Each listing includes a 
 * `GET /images/search` now supports maximum returned search results `limit`.
 * `POST /containers/{name:.*}/copy` is now removed and errors out starting from this API version.
 * API errors are now returned as JSON instead of plain text.
+* `POST /container/create` now takes `AutoRemove` in HostConfig, auto-removal will be done on daemon side.
 
 ### v1.23 API changes
 
